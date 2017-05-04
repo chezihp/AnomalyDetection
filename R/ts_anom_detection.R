@@ -35,6 +35,7 @@
 #' @param title Title for the output plot.
 #' @param verbose Enable debug messages.
 #' @param na.rm Remove any NAs in timestamps.(default: FALSE) 
+#' @param pad Pad gaps in the time series (default: TRUE) 
 #' @return The returned value is a list with the following components.
 #' @return \item{anoms}{Data frame containing timestamps, values, and optionally expected values.}
 #' @return \item{plot}{A graphical object if plotting was requested by the user. The plot contains
@@ -64,7 +65,7 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
                                alpha = 0.05, only_last = NULL, threshold = 'None',
                                e_value = FALSE, longterm = FALSE, piecewise_median_period_weeks = 2, plot = FALSE,
                                y_log = FALSE, xlabel = '', ylabel = 'count',
-                               title = NULL, verbose=FALSE, na.rm = FALSE){
+                               title = NULL, verbose=FALSE, na.rm = FALSE, pad = TRUE){
 
   # Check for supported inputs types
   if(!is.data.frame(x)){
@@ -85,6 +86,10 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
   
   if(!is.logical(na.rm)){
     stop("na.rm must be either TRUE (T) or FALSE (F)")
+  }
+  
+  if(!is.logical(pad)){
+    stop("pad must be either TRUE (T) or FALSE (F)")
   }
   
   # Deal with NAs in timestamps
@@ -152,6 +157,10 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
   # Although we derive this in S-H-ESD, we also need it to be minutley later on so we do it here first.
   gran <- get_gran(x, 1)
 
+  # Deal with gaps in timestamps
+  if(pad)
+    x <- interpolate_pad_data(x, by=gran)
+  
   if(gran == "day"){
     num_days_per_line <- 7
     if(is.character(only_last) &&  only_last == 'hr'){
