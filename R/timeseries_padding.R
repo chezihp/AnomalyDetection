@@ -14,8 +14,9 @@ get_all_times <- function(data, attr, by) {
   
   all.dates       <- seq(info.date.min, info.date.max, by=by)
   all.dates.frame <- data.frame(list(time=all.dates))
-  names(all.dates.frame) <- attr
-  merged.data <- merge(all.dates.frame, sorted.data, all=T)
+  all.dates.frame$time <- as.POSIXct(all.dates.frame$time)
+  sorted.data$timestamp <- as.POSIXct(sorted.data$timestamp)
+  merged.data <- merge(all.dates.frame, sorted.data, all.x=T, by.x='time', by.y=attr)
   merged.data
 }
 

@@ -9,7 +9,7 @@ AnomalyDetectionTs(x, max_anoms = 0.1, direction = "pos", alpha = 0.05,
   only_last = NULL, threshold = "None", e_value = FALSE,
   longterm = FALSE, piecewise_median_period_weeks = 2, plot = FALSE,
   y_log = FALSE, xlabel = "", ylabel = "count", title = NULL,
-  verbose = FALSE, na.rm = FALSE, zero_pad = TRUE)
+  verbose = FALSE, na.rm = FALSE, pad = TRUE)
 }
 \arguments{
 \item{x}{Time series as a two column data frame where the first column consists of the
@@ -53,7 +53,7 @@ large positive anomalies relative to the rest of the data.}
 
 \item{na.rm}{Remove any NAs in timestamps.(default: FALSE)}
 
-\item{zero_pad}{Pad gaps in the time series with zeros. (default: TRUE)}
+\item{pad}{Pad gaps in the time series (default: TRUE)}
 }
 \value{
 The returned value is a list with the following components.
