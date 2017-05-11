@@ -1,6 +1,6 @@
 detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL,
                          use_decomp = TRUE, use_esd = FALSE, one_tail = TRUE,
-                         upper_tail = TRUE, verbose = FALSE) {
+                         upper_tail = TRUE, verbose = FALSE, seasonalities = NULL) {
  # Detects anomalies in a time series using S-H-ESD.
  #
  # Args:
@@ -13,13 +13,17 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
  #	 one_tail: If TRUE only positive or negative going anomalies are detected depending on if upper_tail is TRUE or FALSE.
  #	 upper_tail: If TRUE and one_tail is also TRUE, detect only positive going (right-tailed) anomalies. If FALSE and one_tail is TRUE, only detect negative (left-tailed) anomalies.
  #	 verbose: Additionally printing for debugging.
+ #   seasonalities: list containing integers representing the periodical cycles in num_obs_per_period units
  # Returns:
  #   A list containing the anomalies (anoms) and decomposition components (stl).
-
     if(is.null(num_obs_per_period)){
         stop("must supply period length for time series decomposition")
     }
-
+  
+    if(is.null(seasonalities)){
+      seasonalities <- list(1L)
+    }
+  
     num_obs <- nrow(data)
 
     # Check to make sure we have at least two periods worth of data for anomaly context
@@ -38,14 +42,16 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
     }
     
     # -- Step 1: Decompose data. This returns a univarite remainder which will be used for anomaly detection. Optionally, we might NOT decompose.
-    data_decomp <- stl(ts(data[[2L]], frequency = num_obs_per_period),
-                       s.window = "periodic", robust = TRUE)
-    
-    # Remove the seasonal component, and the median of the data to create the univariate remainder
-    data <- data.frame(timestamp = data[[1L]], count = (data[[2L]]-data_decomp$time.series[,"seasonal"]-median(data[[2L]])))
-    
-    # Store the smoothed seasonal component, plus the trend component for use in determining the "expected values" option
-    data_decomp <- data.frame(timestamp=data[[1L]], count=(as.numeric(trunc(data_decomp$time.series[,"trend"]+data_decomp$time.series[,"seasonal"]))))
+    data_decomp <- data.frame(timestamp=data[[1L]], count=0.0)
+    data <- data.frame(timestamp = data[[1L]], count = data[[2L]])
+    for(s in seasonalities){
+      data_decomp_s <- stl(ts(data[[2L]], frequency = num_obs_per_period*s),
+                             s.window = "periodic", robust = TRUE)
+      # Remove the seasonal component, and the median of the data to create the univariate remainder
+      data$count <- data[[2L]]-as.numeric(trunc(data_decomp_s$time.series[,"seasonal"]))-median(data[[2L]])
+      # Store the smoothed seasonal component, plus the trend component for use in determining the "expected values" option
+      data_decomp$count <- (as.numeric(trunc(data_decomp$count))) + (as.numeric(trunc(data_decomp_s$time.series[,"trend"]+data_decomp_s$time.series[,"seasonal"])))
+    }
 
     if(posix_timestamp){
         data_decomp <- format_timestamp(data_decomp)
@@ -54,7 +60,7 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
     max_outliers <- trunc(num_obs*k)
 
     if(max_outliers == 0){
-      stop(paste0("With longterm=TRUE, AnomalyDetection splits the data into 2 week periods by default. You have ", num_obs, " observations in a period, which is too few. Set a higher piecewise_median_period_weeks."))
+      stop(paste0("You have ", num_obs, " observations and you set max_anoms to ", k, ". To produce atleast one anomaly you must provide atleast ", 1/k, " observations"))
     }
 
     func_ma <- match.fun(median)

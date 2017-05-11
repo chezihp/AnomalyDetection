@@ -35,7 +35,10 @@
 #' @param title Title for the output plot.
 #' @param verbose Enable debug messages.
 #' @param na.rm Remove any NAs in timestamps.(default: FALSE) 
-#' @param pad Pad gaps in the time series (default: TRUE) 
+#' @param pad Fill pad gaps in the time series. Null means no padding (default: interpolate). Options are:
+#' \code{NULL | 'zero' | 'interpolate'}.
+#' @param seasonalities List containing integers each represents a periodical cycle. Units are in num_obs_per_period scale.
+#' \code{NULL} means there is no known seasonality hence the default num_obs_per_period will be taken for seasonality as usual.
 #' @return The returned value is a list with the following components.
 #' @return \item{anoms}{Data frame containing timestamps, values, and optionally expected values.}
 #' @return \item{plot}{A graphical object if plotting was requested by the user. The plot contains
@@ -65,8 +68,7 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
                                alpha = 0.05, only_last = NULL, threshold = 'None',
                                e_value = FALSE, longterm = FALSE, piecewise_median_period_weeks = 2, plot = FALSE,
                                y_log = FALSE, xlabel = '', ylabel = 'count',
-                               title = NULL, verbose=FALSE, na.rm = FALSE, pad = TRUE){
-
+                               title = NULL, verbose=FALSE, na.rm = FALSE, pad = 'interpolate', seasonalities = NULL){
   # Check for supported inputs types
   if(!is.data.frame(x)){
     stop("data must be a single data frame.")
@@ -88,8 +90,12 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
     stop("na.rm must be either TRUE (T) or FALSE (F)")
   }
   
-  if(!is.logical(pad)){
-    stop("pad must be either TRUE (T) or FALSE (F)")
+  if(!is.null(pad) && !pad %in% c('interpolate','zero')){
+    stop("pad must be either NULL or 'interpolate' or 'zero'")
+  }
+  
+  if(!is.null(seasonalities) && (!is.list(seasonalities) || !all(is.integer(unlist(seasonalities))))){
+    stop("seasonalities must be either NULL or list of integers")
   }
   
   # Deal with NAs in timestamps
@@ -158,8 +164,12 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
   gran <- get_gran(x, 1)
 
   # Deal with gaps in timestamps
-  if(pad)
-    x <- interpolate_pad_data(x, by=gran)
+  if(!is.null(pad)){
+    if(pad == 'interpolate')
+      x <- interpolate_pad_data(x, by=gran)
+    else if(pad == 'zero')
+      x <- zero_pad_data(x, by=gran)
+  }
   
   if(gran == "day"){
     num_days_per_line <- 7
@@ -236,7 +246,7 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
     # detect_anoms actually performs the anomaly detection and returns the results in a list containing the anomalies
     # as well as the decomposed components of the time series for further analysis.
     s_h_esd_timestamps <- detect_anoms(all_data[[i]], k=max_anoms, alpha=alpha, num_obs_per_period=period, use_decomp=TRUE, use_esd=FALSE,
-                                       one_tail=anomaly_direction$one_tail, upper_tail=anomaly_direction$upper_tail, verbose=verbose)
+                                       one_tail=anomaly_direction$one_tail, upper_tail=anomaly_direction$upper_tail, verbose=verbose, seasonalities=seasonalities)
 
     # store decomposed components in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
     data_decomp <- s_h_esd_timestamps$stl
