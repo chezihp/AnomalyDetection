@@ -193,7 +193,7 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
   num_obs <- length(x[[2]])
 
   if(max_anoms < 1/num_obs){
-    max_anoms <- 1/num_obs
+    warning(paste0("max_anoms (=",max_anoms,") is too small to detect outliers in ",num_obs," results."))
   }
 
   # -- Setup for longterm time series

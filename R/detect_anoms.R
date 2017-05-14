@@ -45,6 +45,9 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
     data_decomp <- data.frame(timestamp=data[[1L]], count=0.0)
     data <- data.frame(timestamp = data[[1L]], count = data[[2L]])
     for(s in seasonalities){
+      #stl needs at least two periods in the timeseries. Although the pre-condition of the daily seasonality is already checked before
+      if(length(data[[2L]]) < num_obs_per_period*s*2)
+        next
       data_decomp_s <- stl(ts(data[[2L]], frequency = num_obs_per_period*s),
                              s.window = "periodic", robust = TRUE)
       # Remove the seasonal component, and the median of the data to create the univariate remainder
