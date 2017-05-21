@@ -63,6 +63,8 @@
 #' AnomalyDetectionTs(raw_data, max_anoms=0.02, direction='both', only_last="day", plot=TRUE)
 #' @seealso \code{\link{AnomalyDetectionVec}}
 #' @export
+#' @import stats
+#' @importFrom graphics plot.new
 #'
 AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
                                alpha = 0.05, only_last = NULL, threshold = 'None',

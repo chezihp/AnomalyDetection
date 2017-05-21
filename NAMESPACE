@@ -2,4 +2,6 @@
 
 export(AnomalyDetectionTs)
 export(AnomalyDetectionVec)
+import(stats)
 import(zoo)
+importFrom(graphics,plot.new)
