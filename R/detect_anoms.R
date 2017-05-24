@@ -35,6 +35,10 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
     posix_timestamp <- if (class(data[[1L]])[1L] == "POSIXlt") TRUE else FALSE
 
     # Handle NAs
+    if (all(is.na(data[[2L]]))){
+      stop("Data contains only NAs.")
+    }
+      
     if (length(rle(is.na(c(NA,data[[2L]],NA)))$values)>3){
       stop("Data contains non-leading NAs. We suggest replacing NAs with interpolated values (see na.approx in Zoo package).")
     } else {
