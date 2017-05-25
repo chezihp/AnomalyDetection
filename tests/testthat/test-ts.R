@@ -41,6 +41,18 @@ test_that("When only daily seasonality is decomposed in multiple seasonalities d
 })
 
 test_that("When both daily and weekly seasonalities are decomposed -> no anomalies found", {
-  results <- AnomalyDetectionTs(raw_data_multiple_seasonalities, max_anoms=0.01, direction='both', alpha = 1e-12, longterm = FALSE, threshold='p99', only_last = 'hr', e_value=TRUE, pad = 'interpolate', seasonalities = list(1L,7L))
+  results <- AnomalyDetectionTs(raw_data_multiple_seasonalities, max_anoms=0.01, direction='both', alpha = 1e-12, longterm = FALSE, threshold='p99', only_last = 'hr', e_value=TRUE, pad = 'interpolate', seasonalities = c(1L,7L))
   expect_equal(length(results$anoms), 0)
+})
+
+test_that("When daily data is given -> find anomaly at last day", {
+  results <- AnomalyDetectionTs(raw_data_daily, max_anoms=0.01, direction='both', alpha = 1e-12, longterm = FALSE, threshold='p99', only_last = 'hr', e_value=TRUE, pad = 'interpolate', seasonalities = c(1L,7L))
+  expect_equal(length(results$anoms), 3)
+  expect_equal(length(results$anoms[[2L]]), 1)
+})
+
+test_that("When gran given -> find anomaly at last day", {
+  results <- AnomalyDetectionTs(raw_data_daily, max_anoms=0.01, direction='both', alpha = 1e-12, longterm = FALSE, threshold='p99', only_last = 'hr', e_value=TRUE, pad = 'interpolate', seasonalities = c(1L,7L), gran = 'day')
+  expect_equal(length(results$anoms), 3)
+  expect_equal(length(results$anoms[[2L]]), 1)
 })

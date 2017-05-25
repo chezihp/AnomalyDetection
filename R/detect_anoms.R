@@ -1,4 +1,4 @@
-detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL,
+detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_daily_period = NULL,
                          use_decomp = TRUE, use_esd = FALSE, one_tail = TRUE,
                          upper_tail = TRUE, verbose = FALSE, seasonalities = NULL) {
  # Detects anomalies in a time series using S-H-ESD.
@@ -7,28 +7,33 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
  #	 data: Time series to perform anomaly detection on.
  #	 k: Maximum number of anomalies that S-H-ESD will detect as a percentage of the data.
  #	 alpha: The level of statistical significance with which to accept or reject anomalies.
- #	 num_obs_per_period: Defines the number of observations in a single period, and used during seasonal decomposition.
+ #	 num_obs_per_daily_period: Defines the number of observations in a single day period, and used during seasonal decomposition.
  #	 use_decomp: Use seasonal decomposition during anomaly detection.
  #	 use_esd: Uses regular ESD instead of hybrid-ESD. Note hybrid-ESD is more statistically robust.
  #	 one_tail: If TRUE only positive or negative going anomalies are detected depending on if upper_tail is TRUE or FALSE.
  #	 upper_tail: If TRUE and one_tail is also TRUE, detect only positive going (right-tailed) anomalies. If FALSE and one_tail is TRUE, only detect negative (left-tailed) anomalies.
  #	 verbose: Additionally printing for debugging.
- #   seasonalities: list containing integers representing the periodical cycles in num_obs_per_period units
+ #   seasonalities: Integers representing the periodical cycles in num_obs_per_daily_period units
  # Returns:
  #   A list containing the anomalies (anoms) and decomposition components (stl).
-    if(is.null(num_obs_per_period)){
+    if(is.null(num_obs_per_daily_period)){
         stop("must supply period length for time series decomposition")
     }
   
     if(is.null(seasonalities)){
-      seasonalities <- list(1L)
+      seasonalities <- c(1L)
     }
+
+    # Avoid checking seasonaliies with cycles smaller then input frequency
+  seasonalities <- seasonalities[seasonalities*num_obs_per_daily_period > 1]
   
     num_obs <- nrow(data)
 
     # Check to make sure we have at least two periods worth of data for anomaly context
-    if(num_obs < num_obs_per_period * 2){
-        stop("Anom detection needs at least 2 periods worth of data")
+    if(num_obs < min(seasonalities) * num_obs_per_daily_period * 2){
+        stop(
+          sprintf("Anom detection needs at least 2 periods worth of data. num_obs=%s, min(seasonalities)=%s, num_obs_per_daily_period=%s",
+                 num_obs,min(seasonalities),num_obs_per_daily_period))
     }
 
     # Check if our timestamps are posix
@@ -50,9 +55,9 @@ detect_anoms <- function(data, k = 0.49, alpha = 0.05, num_obs_per_period = NULL
     data <- data.frame(timestamp = data[[1L]], count = data[[2L]])
     for(s in seasonalities){
       #stl needs at least two periods in the timeseries. Although the pre-condition of the daily seasonality is already checked before
-      if(length(data[[2L]]) <= num_obs_per_period*s*2)
+      if(length(data[[2L]]) <= num_obs_per_daily_period*s*2)
         next
-      data_decomp_s <- stl(ts(data[[2L]], frequency = num_obs_per_period*s),
+      data_decomp_s <- stl(ts(data[[2L]], frequency = num_obs_per_daily_period*s),
                              s.window = "periodic", robust = TRUE)
       # Remove the seasonal component, and the median of the data to create the univariate remainder
       data$count <- data[[2L]]-as.numeric(trunc(data_decomp_s$time.series[,"seasonal"]))-median(data[[2L]])

@@ -37,8 +37,11 @@
 #' @param na.rm Remove any NAs in timestamps.(default: FALSE) 
 #' @param pad Fill pad gaps in the time series. Null means no padding (default: interpolate). Options are:
 #' \code{NULL | 'zero' | 'interpolate'}.
-#' @param seasonalities List containing integers each represents a periodical cycle. Units are in num_obs_per_period scale.
-#' \code{NULL} means there is no known seasonality hence the default num_obs_per_period will be taken for seasonality as usual.
+#' @param seasonalities Integers each represents a periodical cycle. Units are in num_obs_per_daily_period scale.
+#' \code{NULL} means there is no known seasonality hence the default num_obs_per_daily_period will be taken for seasonality as usual.
+#' @param gran The granularity sample rate of the timestamps.  Options are:
+#' \code{NULL | 'sec' | 'min' | 'hr' | 'day' | 'week'}.
+#' \code{NULL} means there is no known sample rate hence the default calculation (get_gran) will takes place
 #' @return The returned value is a list with the following components.
 #' @return \item{anoms}{Data frame containing timestamps, values, and optionally expected values.}
 #' @return \item{plot}{A graphical object if plotting was requested by the user. The plot contains
@@ -70,7 +73,7 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
                                alpha = 0.05, only_last = NULL, threshold = 'None',
                                e_value = FALSE, longterm = FALSE, piecewise_median_period_weeks = 2, plot = FALSE,
                                y_log = FALSE, xlabel = '', ylabel = 'count',
-                               title = NULL, verbose=FALSE, na.rm = FALSE, pad = 'interpolate', seasonalities = NULL){
+                               title = NULL, verbose=FALSE, na.rm = FALSE, pad = 'interpolate', seasonalities = NULL, gran = NULL){
   # Check for supported inputs types
   if(!is.data.frame(x)){
     stop("data must be a single data frame.")
@@ -96,9 +99,14 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
     stop("pad must be either NULL or 'interpolate' or 'zero'")
   }
   
-  if(!is.null(seasonalities) && (!is.list(seasonalities) || !all(is.integer(unlist(seasonalities))))){
-    stop("seasonalities must be either NULL or list of integers")
+  if(!is.null(seasonalities) && !is.integer(seasonalities)){
+    stop("seasonalities must be either NULL or integers")
   }
+  
+  if(!is.null(gran) && !gran %in% c('sec','min','hr','day','week')){
+    stop("gran must be either NULL or 'sec','min','hr','day','week'")
+  }
+  
   
   # Deal with NAs in timestamps
   if(any(is.na(x$timestamp))){
@@ -163,7 +171,8 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
 
   # Derive number of observations in a single day.
   # Although we derive this in S-H-ESD, we also need it to be minutley later on so we do it here first.
-  gran <- get_gran(x, 1)
+  if(is.null(gran))
+    gran <- get_gran(x, 1)
 
   # Deal with gaps in timestamps
   if(!is.null(pad)){
@@ -187,11 +196,11 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
     x <- format_timestamp(aggregate(x[2], format(x[1], "%Y-%m-%d %H:%M:00"), eval(parse(text="sum"))))
   }
 
-  period = switch(gran,
+  day_period = switch(gran,
                   min = 1440,
                   hr = 24,
-                  # if the data is daily, then we need to bump the period to weekly to get multiple examples
-                  day = 7)
+                  day = 1,
+                  week = 1/7)
   num_obs <- length(x[[2]])
 
   if(max_anoms < 1/num_obs){
@@ -203,15 +212,8 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
   # If longterm is enabled, break the data into subset data frames and store in all_data
   if(longterm){
     # Pre-allocate list with size equal to the number of piecewise_median_period_weeks chunks in x + any left over chunk
-    # handle edge cases for daily and single column data period lengths
-    if(gran == "day"){
-      # STL needs 2*period + 1 observations
-      num_obs_in_period <- period*piecewise_median_period_weeks + 1
-      num_days_in_period <- (7*piecewise_median_period_weeks) + 1
-    } else {
-      num_obs_in_period <- period*7*piecewise_median_period_weeks
-      num_days_in_period <- (7*piecewise_median_period_weeks)
-    }
+    num_obs_in_period <- day_period*7*piecewise_median_period_weeks
+    num_days_in_period <- (7*piecewise_median_period_weeks)
 
     # Store last date in time series
     last_date <- x[[1]][num_obs]
@@ -247,7 +249,7 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
 
     # detect_anoms actually performs the anomaly detection and returns the results in a list containing the anomalies
     # as well as the decomposed components of the time series for further analysis.
-    s_h_esd_timestamps <- detect_anoms(all_data[[i]], k=max_anoms, alpha=alpha, num_obs_per_period=period, use_decomp=TRUE, use_esd=FALSE,
+    s_h_esd_timestamps <- detect_anoms(all_data[[i]], k=max_anoms, alpha=alpha, num_obs_per_daily_period=day_period, use_decomp=TRUE, use_esd=FALSE,
                                        one_tail=anomaly_direction$one_tail, upper_tail=anomaly_direction$upper_tail, verbose=verbose, seasonalities=seasonalities)
 
     # store decomposed components in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
@@ -370,21 +372,15 @@ AnomalyDetectionTs <- function(x, max_anoms = 0.10, direction = 'pos',
 
   }
 
-  # Fix to make sure date-time is correct and that we retain hms at midnight
-  all_anoms[[1]] <- format(all_anoms[[1]], format="%Y-%m-%d %H:%M:%S")
-  
   # Store expected values if set by user
   if(e_value) {
     anoms <- data.frame(timestamp=all_anoms[[1]], anoms=all_anoms[[2]], 
-                        expected_value=subset(seasonal_plus_trend[[2]], as.POSIXlt(seasonal_plus_trend[[1]], tz="UTC") %in% all_anoms[[1]]),
+                        expected_value=subset(seasonal_plus_trend[[2]], as.POSIXct(seasonal_plus_trend[[1]], tz="UTC")
+                                              %in% as.POSIXct(all_anoms[[1]], tz = "UTC")),
                         stringsAsFactors=FALSE)
   } else {
     anoms <- data.frame(timestamp=all_anoms[[1]], anoms=all_anoms[[2]], stringsAsFactors=FALSE)
   }
-
-  # Make sure we're still a valid POSIXlt datetime.
-  # TODO: Make sure we keep original datetime format and timezone.
-  anoms$timestamp <- as.POSIXlt(anoms$timestamp, tz="UTC")
 
   # Lastly, return anoms and optionally the plot if requested by the user
   if(plot){

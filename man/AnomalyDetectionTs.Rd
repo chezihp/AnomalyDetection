@@ -10,7 +10,7 @@ AnomalyDetectionTs(x, max_anoms = 0.1, direction = "pos", alpha = 0.05,
   longterm = FALSE, piecewise_median_period_weeks = 2, plot = FALSE,
   y_log = FALSE, xlabel = "", ylabel = "count", title = NULL,
   verbose = FALSE, na.rm = FALSE, pad = "interpolate",
-  seasonalities = NULL)
+  seasonalities = NULL, gran = NULL)
 }
 \arguments{
 \item{x}{Time series as a two column data frame where the first column consists of the
@@ -57,8 +57,12 @@ large positive anomalies relative to the rest of the data.}
 \item{pad}{Fill pad gaps in the time series. Null means no padding (default: interpolate). Options are:
 \code{NULL | 'zero' | 'interpolate'}.}
 
-\item{seasonalities}{List containing integers each represents a periodical cycle. Units are in num_obs_per_period scale.
-\code{NULL} means there is no known seasonality hence the default num_obs_per_period will be taken for seasonality as usual.}
+\item{seasonalities}{Integers each represents a periodical cycle. Units are in num_obs_per_daily_period scale.
+\code{NULL} means there is no known seasonality hence the default num_obs_per_daily_period will be taken for seasonality as usual.}
+
+\item{gran}{The granularity sample rate of the timestamps.  Options are:
+\code{NULL | 'sec' | 'min' | 'hr' | 'day' | 'week'}.
+\code{NULL} means there is no known sample rate hence the default calculation (get_gran) will takes place}
 }
 \value{
 The returned value is a list with the following components.

@@ -159,7 +159,7 @@ AnomalyDetectionVec = function(x, max_anoms=0.10, direction='pos',
     
     # detect_anoms actually performs the anomaly detection and returns the results in a list containing the anomalies
     # as well as the decomposed components of the time series for further analysis.
-    s_h_esd_timestamps <- detect_anoms(all_data[[i]], k=max_anoms, alpha=alpha, num_obs_per_period=period, use_decomp=TRUE, use_esd=FALSE, 
+    s_h_esd_timestamps <- detect_anoms(all_data[[i]], k=max_anoms, alpha=alpha, num_obs_per_daily_period=period, use_decomp=TRUE, use_esd=FALSE, 
                                        one_tail=anomaly_direction$one_tail, upper_tail=anomaly_direction$upper_tail, verbose=verbose) 
     
     # store decomposed components in local variable and overwrite s_h_esd_timestamps to contain only the anom timestamps
